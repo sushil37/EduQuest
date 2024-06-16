@@ -18,8 +18,9 @@ class DatabaseSeeder extends Seeder
             UsersTableSeeder::class,
             OptionsTableSeeder::class,
             QuestionsTableSeeder::class,
+            QuestionnaireTable::class,
             QuestionnaireStudentTableSeeder::class,
-            ResponsesTableSeeder::class,
+//            ResponsesTableSeeder::class,
         ]);
     }
 }

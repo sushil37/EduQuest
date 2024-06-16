@@ -14,6 +14,7 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
 
+CONST FRONTEND_API = 'http://localhost:5173';
 #[AllowDynamicProperties]
 class QuestionnaireRepository extends BaseRepository
 {
@@ -73,17 +74,19 @@ class QuestionnaireRepository extends BaseRepository
 
             // Attach student with access URL to questionnaire
             $questionnaire->students()->attach($student->id, ['access_url' => $accessUrl]);
+            $fullAccessUrl = FRONTEND_API.'/questionnaire/access/' . $questionnaire->id . '/' . $accessUrl;
 
-            $fullAccessUrl = route('questionnaire.access', [
-                'questionnaire' => $questionnaire->id,
-                'access_url' => $accessUrl,
-            ]);
+//            $fullAccessUrl = route('questionnaire.access', [
+//                'questionnaire' => $questionnaire->id,
+//                'access_url' => $accessUrl,
+//            ]);
 
             // Send invitation email
-            Mail::raw("You are invited to complete the questionnaire: {$questionnaire->title}. Use this URL to access it: $fullAccessUrl", function ($message) use ($student) {
+            Mail::raw("You are invited to complete the questionnaire: {$questionnaire->title}. Use this URL to access it: <a href=\"$fullAccessUrl\">$fullAccessUrl</a>", function ($message) use ($student) {
                 $message->to($student->email)
                     ->subject('Questionnaire Invitation');
             });
+
         }
     }
 
@@ -97,10 +100,11 @@ class QuestionnaireRepository extends BaseRepository
             $query->where('questionnaire_id', $questionnaireId)
                   ->where('access_url', $accessUrl);
         })->exists();
+
         Log::info('Student check result', ['exists' => $studentCheck]);
         if (!$studentCheck) {
             Log::warning('No matching student found');
-            return null; // Or throw an exception
+            return null;
         }
 
         $questionnaire = $this->model::whereHas('students', function ($query) use ($questionnaireId, $accessUrl) {

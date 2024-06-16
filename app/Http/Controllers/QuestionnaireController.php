@@ -30,12 +30,16 @@ class QuestionnaireController extends Controller
     public function sendInvitations(Request $request, $questionnaireId): JsonResponse
     {
         $this->questionnaireRepository->sendInvitations($request, $questionnaireId);
-        return response()->json(['message' => 'Invitations sent successfully.']);
+        return response()->json(['message' => 'Invitations sent successfully. Please check your email.']);
     }
 
-    public function accessQuestionnaire($questionnaireId, $accessUrl): QuestionnaireResource
+    public function accessQuestionnaire($questionnaireId, $accessUrl)
     {
         $questionnaire = $this->questionnaireRepository->accessQuestionnaire($questionnaireId, $accessUrl);
+        if(!$questionnaire){
+            return response()->json(['message' => 'You do not have access to this questionnaires.'], 400);
+
+        }
         return new QuestionnaireResource($questionnaire);
     }
 
