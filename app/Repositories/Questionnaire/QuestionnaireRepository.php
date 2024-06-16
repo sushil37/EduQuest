@@ -76,11 +76,10 @@ class QuestionnaireRepository extends BaseRepository
 
             $fullAccessUrl = FRONTEND_API.'/questionnaire/access/' . $questionnaire->id . '/' . $accessUrl;
 
-            Mail::raw("You are invited to complete the questionnaire: {$questionnaire->title}. Use this URL to access it: <a href=\"$fullAccessUrl\">$fullAccessUrl</a>", function ($message) use ($student) {
+            Mail::html("<h3>You are invited to complete the questionnaire: {$questionnaire->title}.</h3><p>Use this URL to access it: <a href=\"$fullAccessUrl\">$fullAccessUrl</a></p>", function ($message) use ($student) {
                 $message->to($student->email)
                     ->subject('Questionnaire Invitation');
             });
-
         }
     }
 
