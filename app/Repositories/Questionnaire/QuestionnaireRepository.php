@@ -55,6 +55,7 @@ class QuestionnaireRepository extends BaseRepository
     public function sendInvitations($requestData, $questionnaireId)
     {
         $questionnaire = $this->model::findOrFail($questionnaireId);
+
         // Fetch students (for testing limit to 4)
         $students = $this->user::where('type', 'student')->limit(4)->get();
 
@@ -71,17 +72,10 @@ class QuestionnaireRepository extends BaseRepository
         // Send invitations to students
         foreach ($students as $student) {
             $accessUrl = Str::random(40);
-
-            // Attach student with access URL to questionnaire
             $questionnaire->students()->attach($student->id, ['access_url' => $accessUrl]);
+
             $fullAccessUrl = FRONTEND_API.'/questionnaire/access/' . $questionnaire->id . '/' . $accessUrl;
 
-//            $fullAccessUrl = route('questionnaire.access', [
-//                'questionnaire' => $questionnaire->id,
-//                'access_url' => $accessUrl,
-//            ]);
-
-            // Send invitation email
             Mail::raw("You are invited to complete the questionnaire: {$questionnaire->title}. Use this URL to access it: <a href=\"$fullAccessUrl\">$fullAccessUrl</a>", function ($message) use ($student) {
                 $message->to($student->email)
                     ->subject('Questionnaire Invitation');
@@ -113,6 +107,7 @@ class QuestionnaireRepository extends BaseRepository
                 ->where('access_url', $accessUrl);
         })->with('questions.options')
             ->firstOrFail();
+
 
         Log::info('Retrieved questionnaire', ['questionnaire' => $questionnaire]);
 

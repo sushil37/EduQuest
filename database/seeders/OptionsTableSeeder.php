@@ -3,6 +3,7 @@
 namespace Database\Seeders;
 
 use App\Models\Option;
+use App\Models\Question;
 use Illuminate\Database\Seeder;
 
 class OptionsTableSeeder extends Seeder
@@ -12,6 +13,9 @@ class OptionsTableSeeder extends Seeder
      */
     public function run(): void
     {
-        Option::factory()->count(50)->create();
+        $question = Question::all();
+        foreach ($question as $question) {
+            Option::factory()->count(4)->create(['question_id' => $question->id]);
+        }
     }
 }
