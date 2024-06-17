@@ -21,4 +21,8 @@ This Laravel application manages questionnaires for physics and chemistry exams.
     ```
 3. Access the application: Open http://localhost:8000 in your web browser.
 
-4. For more info: https://laravel.com/docs/11.x
+4. Run Unit Test
+   ```bash
+   php artisan test
+    ```
+5. For more info: https://laravel.com/docs/11.x
