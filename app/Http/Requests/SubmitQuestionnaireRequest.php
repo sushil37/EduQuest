@@ -25,8 +25,8 @@ class SubmitQuestionnaireRequest extends FormRequest
         return [
             'student_id' => 'required|integer|exists:users,id',
             'responses' => 'required|array',
-            'responses.*.question_id' => 'required|integer',
-            'responses.*.option_id' => 'required',
+            'responses.*.question_id' => 'required|integer|exists:questions,id',
+            'responses.*.option_id' => 'required|integer|exists:options,id',
         ];
     }
 }

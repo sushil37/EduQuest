@@ -9,42 +9,42 @@ use App\Models\Response;
 use App\Models\User;
 use App\Repositories\BaseRepository;
 use Carbon\Carbon;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
-
+use Illuminate\Mail\Mailer;
 CONST FRONTEND_API = 'http://localhost:5173';
 #[AllowDynamicProperties]
 class QuestionnaireRepository extends BaseRepository
 {
+    protected Mailer $mailer;
 
-    public function __construct(Questionnaire $model, Question $question, User $user)
+    public function __construct(Questionnaire $model, protected Question $question, protected User $user, protected Response  $response, Mailer $mailer)
     {
         parent::__construct($model);
-        $this->question = $question;
-        $this->user = $user;
+        $this->mailer = $mailer;
     }
 
     public function createQuestionnaire($request)
     {
-        $questionnaire = $this->model::create([
+        $questionnaire = $this->model->create([
             'title' => $request->title,
             'expiry_date' => $request->expiry_date,
         ]);
 
-        $physicsQuestions = $this->question::where('subject', 'physics')->inRandomOrder()->take(5)->pluck('id');
-        $chemistryQuestions = $this->question::where('subject', 'chemistry')->inRandomOrder()->take(5)->pluck('id');
+        $physicsQuestions = $this->getRandomQuestionIdsBySubject('Physics');
+        $chemistryQuestions = $this->getRandomQuestionIdsBySubject('Chemistry');
 
         $allQuestions = $physicsQuestions->merge($chemistryQuestions);
-
-        Log::info('Physics Questions', ['questions' => $physicsQuestions]);
-        Log::info('Chemistry Questions', ['questions' => $chemistryQuestions]);
-        Log::info('All Questions', ['questions' => $allQuestions]);
-
         $questionnaire->questions()->attach($allQuestions);
 
         return $questionnaire;
+    }
+
+    private function getRandomQuestionIdsBySubject(string $subject)
+    {
+        return $this->question::where('subject', $subject)->inRandomOrder()->take(5)->pluck('id');
     }
 
     public function getActiveQuestionnaires()
@@ -52,35 +52,42 @@ class QuestionnaireRepository extends BaseRepository
         return $this->model::where('expiry_date', '>', Carbon::now())->get();
     }
 
-    public function sendInvitations($requestData, $questionnaireId)
+    private function getRandomQuestions()
     {
-        $questionnaire = $this->model::findOrFail($questionnaireId);
-
-        // Fetch students (for testing limit to 4)
-        $students = $this->user::where('type', 'student')->limit(4)->get();
-
-        // Fetch questions for this questionnaire
         $physicsQuestions = $this->question::where('subject', 'Physics')->inRandomOrder()->take(5)->pluck('id');
         $chemistryQuestions = $this->question::where('subject', 'Chemistry')->inRandomOrder()->take(5)->pluck('id');
 
-        // Merge physics and chemistry questions
-        $allQuestions = $physicsQuestions->merge($chemistryQuestions);
+        return $physicsQuestions->merge($chemistryQuestions);
+    }
+
+    private function sendInvitationEmail($recipientEmail, $questionnaire, $fullAccessUrl): void
+    {
+        $this->mailer->html("<h3>You are invited to complete the questionnaire: {$questionnaire->title}.</h3><p>Use this URL to access it: <a href=\"$fullAccessUrl\">$fullAccessUrl</a></p>", function ($message) use ($recipientEmail) {
+            $message->to($recipientEmail)
+                ->subject('Questionnaire Invitation');
+        });
+    }
+
+    public function sendInvitations($requestData, $questionnaireId): bool
+    {
+        $questionnaire = $this->model::find($questionnaireId);
+        if(is_null($questionnaire)){
+            return false;
+        }
+        $students = $this->user::where('type', 'student')->limit(4)->get();
+        $allQuestions = $this->getRandomQuestions();
 
         // Attach questions to the questionnaire
         $questionnaire->questions()->attach($allQuestions);
 
-        // Send invitations to students
         foreach ($students as $student) {
             $accessUrl = Str::random(40);
             $questionnaire->students()->attach($student->id, ['access_url' => $accessUrl]);
 
             $fullAccessUrl = FRONTEND_API.'/questionnaire/access/' . $questionnaire->id . '/' . $accessUrl;
-
-            Mail::html("<h3>You are invited to complete the questionnaire: {$questionnaire->title}.</h3><p>Use this URL to access it: <a href=\"$fullAccessUrl\">$fullAccessUrl</a></p>", function ($message) use ($student) {
-                $message->to($student->email)
-                    ->subject('Questionnaire Invitation');
-            });
+            $this->sendInvitationEmail($student->email, $questionnaire, $fullAccessUrl);
         }
+        return true;
     }
 
     public function accessQuestionnaire($questionnaireId, $accessUrl)
@@ -114,17 +121,13 @@ class QuestionnaireRepository extends BaseRepository
         return $questionnaire;
     }
 
-    public function submitQuestionnaire($requestData, $questionnaireId): \Illuminate\Http\JsonResponse
+    public function submitQuestionnaire($requestData, $questionnaireId): JsonResponse
     {
-        $validatedData = $requestData->validated();
-
         try {
-            // Find the questionnaire by ID
-            $questionnaire = Questionnaire::findOrFail($questionnaireId);
-
+            DB::beginTransaction();
+            $questionnaire = $this->model->findOrFail($questionnaireId);
             $answersList = [];
-            // Save each response
-            foreach ($validatedData['responses'] as $response){
+            foreach ($requestData['responses'] as $response){
                 $answerItem = [
                     'questionnaire_id' => $questionnaire->id,
                     'student_id' => $requestData['student_id'],
@@ -133,7 +136,7 @@ class QuestionnaireRepository extends BaseRepository
                 ];
                 $answersList[] = $answerItem;
             }
-            Response::insert($answersList);
+            $this->response->insert($answersList);
             DB::commit();
 
             return response()->json(['message' => 'Responses submitted successfully.'], 200);
@@ -141,7 +144,5 @@ class QuestionnaireRepository extends BaseRepository
             DB::rollBack();
             return response()->json(['message' => 'Failed to submit responses.', 'error' => $e->getMessage()], 500);
         }
-
-
     }
 }

@@ -15,7 +15,7 @@ class BaseRepository implements BaseRepositoryInterface
     /**
      * @var Model
      */
-    protected Model $model;
+    public Model $model;
 
     public function __construct(Model $model)
     {

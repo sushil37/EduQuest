@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Http\Requests\CreateQuestionnaireRequest;
 use App\Http\Requests\SubmitQuestionnaireRequest;
 use App\Http\Resources\QuestionnaireResource;
+use App\Models\User;
 use App\Repositories\Questionnaire\QuestionnaireRepository;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -29,11 +30,14 @@ class QuestionnaireController extends Controller
 
     public function sendInvitations(Request $request, $questionnaireId): JsonResponse
     {
-        $this->questionnaireRepository->sendInvitations($request, $questionnaireId);
+        $data = $this->questionnaireRepository->sendInvitations($request, $questionnaireId);
+        if($data === false){
+            return response()->json(['message' => 'Invalid questionnaireId please check your input .'], 400);
+        }
         return response()->json(['message' => 'Invitations sent successfully. Please check your email.']);
     }
 
-    public function accessQuestionnaire($questionnaireId, $accessUrl)
+    public function accessQuestionnaire($questionnaireId, $accessUrl): JsonResponse|QuestionnaireResource
     {
         $questionnaire = $this->questionnaireRepository->accessQuestionnaire($questionnaireId, $accessUrl);
         if(!$questionnaire){
@@ -45,6 +49,6 @@ class QuestionnaireController extends Controller
 
     public function submitQuestionnaire(SubmitQuestionnaireRequest $request, $questionnaireId): JsonResponse
     {
-        return $this->questionnaireRepository->submitQuestionnaire($request, $questionnaireId);
+        return $this->questionnaireRepository->submitQuestionnaire($request->validated(), $questionnaireId);
     }
 }
